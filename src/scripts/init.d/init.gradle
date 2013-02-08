@@ -1,1 +1,6 @@
-println 'Ron was here!'
+logger.quiet 'Running custom init.gradle file'
+
+
+buildscript {
+    apply from: 'https://raw.github.com/kurron/tl-unified-build/master/common.gradle'
+}
