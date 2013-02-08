@@ -1,0 +1,127 @@
+// inspired by http://mrhaki.blogspot.com/2012/10/gradle-goodness-distribute-custom.html
+
+// Base plugin adds configuration
+// support and build<Configuration>
+// and upload<Configuration> tasks.
+apply plugin: 'base'
+apply plugin: 'maven'
+
+group = 'org.kurron'
+
+if ( project.properties.containsKey( 'project_version' ) )
+{
+    logger.quiet "Using specifed project_version of $project_version"
+    status = 'release'
+}
+else
+{
+    ext.project_version = '1.4.0-SNAPSHOT'
+    logger.quiet "project_version not specified.  Using default version of $project_version"
+    status = 'integration'
+}
+project.version = project.project_version
+
+ext {
+    gradleVersion = '1.4'
+    intranetUsername = 'bob'
+    intranetPassword = 'bob'
+    publicationUrl = "http://192.168.254.81:81/artifactory/mods-release-local"
+    publicationUsername = 'SVNBuild'
+    publicationPassword = 'Snoopy*09'
+    isSnapshot = version.endsWith('-SNAPSHOT')
+}
+
+// Extra configuration to store
+// company Gradle ZIP artifact and
+// use for uploading.
+configurations {
+    companyGradle
+}
+
+if ( isSnapshot )
+{
+    logger.quiet 'Snapshot revision detected. Configuring for local installation.'
+    project.defaultTasks.add( 'install' )
+}
+else
+{
+    logger.quiet 'Release revision detected. Configuring for publication.'
+    uploadCompanyGradle {
+        repositories {
+            maven {
+                description 'Sandbox area of the repository to test publishing to'
+                url = publicationUrl
+                credentials {
+                    username = publicationUsername
+                    password = publicationPassword
+                }
+            }
+        }
+        uploadDescriptor = false
+    }
+
+    defaultTasks.add( 'uploadCompanyGradle' )
+}
+
+task downloadGradle(type: DownloadGradle) {
+    description 'Download Gradle version from Gradle distributions website'
+
+    gradleVersion project.gradleVersion
+    destinationDir file("$buildDir/gradle-downloads")
+}
+
+task companyGradleZip(type: Zip, dependsOn: downloadGradle) {
+    description 'Add extra files to company Gradle distribution'
+
+    // Name for company Gradle ZIP distribution.
+    baseName = 'company-gradle'
+    classifier = 'bin'
+
+    from zipTree(downloadGradle.destinationFile)
+    into("${downloadGradle.distributionNameBase}") {
+        into('init.d') {
+            from "src/scripts/init.d"
+        }
+        // We can do extra stuff here
+        // to add to the company Gradle
+        // distribution ZIP file.
+    }
+}
+
+artifacts {
+    companyGradle companyGradleZip
+}
+
+
+class DownloadGradle extends DefaultTask {
+    @Input
+    String gradleVersion
+
+    @Input
+    File destinationDir
+
+    @Input
+    String gradleDownloadBase = "http://services.gradle.org/distributions"
+
+    @TaskAction
+    doDownloadGradle() {
+        destinationFile.bytes = new URL(downloadUrl).bytes
+    }
+
+    String getDownloadUrl() {
+        "$gradleDownloadBase/$downloadFileName"
+    }
+
+    String getDistributionNameBase() {
+        "gradle-$gradleVersion"
+    }
+
+    String getDownloadFileName() {
+        "$distributionNameBase-bin.zip"
+    }
+
+    @OutputFile
+    File getDestinationFile() {
+        new File(destinationDir, downloadFileName)
+    }
+}
