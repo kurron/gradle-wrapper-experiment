@@ -1,4 +1,5 @@
 // inspired by http://mrhaki.blogspot.com/2012/10/gradle-goodness-distribute-custom.html
+// the Gradle samples also contain an example of how to do this
 
 // Base plugin adds configuration
 // support and build<Configuration>
@@ -23,8 +24,6 @@ project.version = project.project_version
 
 ext {
     gradleVersion = '1.4'
-    intranetUsername = 'bob'
-    intranetPassword = 'bob'
     publicationUrl = "http://192.168.254.81:81/artifactory/mods-release-local"
     publicationUsername = 'SVNBuild'
     publicationPassword = 'Snoopy*09'
@@ -40,8 +39,7 @@ configurations {
 
 if ( isSnapshot )
 {
-    logger.quiet 'Snapshot revision detected. Configuring for local installation.'
-    project.defaultTasks.add( 'install' )
+    logger.quiet 'Snapshot revision detected. Nothing to do. Use -Pproject_version=1.2.3 to publish a new version.'
 }
 else
 {
@@ -63,6 +61,10 @@ else
     defaultTasks.add( 'uploadCompanyGradle' )
 }
 
+task wrapper(type: Wrapper) {
+    gradleVersion = gradleVersion
+}
+
 task downloadGradle(type: DownloadGradle) {
     description 'Download Gradle version from Gradle distributions website'
 
@@ -82,9 +84,6 @@ task companyGradleZip(type: Zip, dependsOn: downloadGradle) {
         into('init.d') {
             from "src/scripts/init.d"
         }
-        // We can do extra stuff here
-        // to add to the company Gradle
-        // distribution ZIP file.
     }
 }
 
