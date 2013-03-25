@@ -1,6 +1,393 @@
 logger.quiet 'Running custom init.gradle file'
 
-
 buildscript {
-    apply from: 'https://raw.github.com/kurron/tl-unified-build/master/common.gradle'
+    allprojects {
+        ext.httpTimeOut = 4  // how many seconds to wait for the configuration files
+        ext.junitVersion  = '4.10'
+        ext.hamcrestVersion  = '1.3'
+        ext.groovyVersion  = '2.1.0'
+        ext.spockVersion  = '0.7-groovy-2.0'
+        ext.stageOne = (false == properties.containsKey( 'stage' ) )|| (properties.get( 'stage').equalsIgnoreCase( 'ONE' ) )
+        ext.publicationUrl = "http://192.168.254.81:81/artifactory/mods-release-local"
+        ext.publicationUsername = 'SVNBuild'
+        ext.publicationPassword = 'Snoopy*09'
+        ext.mavenCentralCacheUrl = "http://192.168.254.81:81/artifactory/repo1-cache"
+        ext.codehausCacheUrl = "http://192.168.254.81:81/artifactory/codehaus-cache"
+        ext.jbossCacheUrl = "http://192.168.254.81:81/artifactory/jboss-cache"
+        ext.springsourceCacheUrl = "http://192.168.254.81:81/artifactory/springsource-repo-cache"
+        ext.localCacheUrl = "http://192.168.254.81:81/artifactory/ext-release-local"
+        ext.localLibsCacheUrl = "http://192.168.254.81:81/artifactory/libs-release-local"
+
+        if ( project.properties.containsKey( 'project_version' ) )
+
+        {
+            logger.quiet "Using specifed project_version of $project_version"
+            status = 'release'
+        }
+        else
+        {
+            ext.project_version = '1.0.0-SNAPSHOT'
+            logger.quiet "project_version not specified.  Using default version of $project_version"
+            status = 'integration'
+        }
+        project.version = project.project_version
+        logger.quiet "version = $project.version"
+
+        group = 'com.transparent'
+
+        buildscript {
+            repositories {
+                maven {
+                    name 'Experimental'
+                    description 'Where to get internally published artifacts'
+                    url = publicationUrl
+                }
+            }
+            dependencies {
+                classpath group: 'org.kurron', name: 'tl-unified-build', version: '1.0.4'
+                classpath 'org.kurron:gradle-cobertura-plugin:2.0.0'
+            }
+        }
+
+        repositories {
+            maven {
+                name 'MavenCache'
+                description 'Local Artifactory cache of Maven Central'
+                url = mavenCentralCacheUrl
+            }
+            maven {
+                name 'CodehausCache'
+                description 'Local Artifactory cache of Codehaus'
+                url = codehausCacheUrl
+            }
+            maven {
+                name 'JbossCache'
+                description 'Local Artifactory cache of JBOSS'
+                url = jbossCacheUrl
+            }
+            maven {
+                name 'SpringSourceCache'
+                description 'Local Artifactory cache of SpringSource'
+                url = springsourceCacheUrl
+            }
+            maven {
+                name 'LocalReleaseCache'
+                description 'Local repository for third party libraries'
+                url = localCacheUrl
+            }
+            maven {
+                name 'LocalLibsCache'
+                description 'Local repository for third party libraries'
+                url = localLibsCacheUrl
+            }
+            maven {
+                name 'Experimental'
+                description 'Local Artifactory cache of TL artifacts'
+                url = publicationUrl
+            }
+            // our Artifactory cache has a problem fetching CodeNarc
+            // update: Scott says this has been fixed
+            //mavenCentral()
+        }
+
+        configurations {
+            sourceArchives {
+                description = 'Artifact that contains the source code of the dependencies.'
+            }
+        }
+
+        if ( stageOne )
+        {
+            afterEvaluate { project ->
+                logger.quiet( "Generating stage one tasks for $name project" )
+                ext.isSnapshot = version.endsWith("-SNAPSHOT")
+
+
+                if ( project.plugins.hasPlugin( WarPlugin ) )
+                {
+                    war {
+                        manifest {
+                            attributes( "Implementation-Title": project.name, "Implementation-Version": project.version )
+                        }                }
+                }
+
+                if ( project.plugins.hasPlugin( JavaPlugin ) )
+                {
+                    logger.quiet 'Java plugin detected!'
+                    project.defaultTasks.add( 'build' )
+
+                    logger.quiet 'Configuring compiler options'
+                    project.tasks.getByName( 'compileJava' ).options*.compilerArgs = ['-Xlint:deprecation','-encoding', 'UTF-8']
+                    project.tasks.getByName( 'compileTestJava' ).options*.compilerArgs = ['-Xlint:deprecation','-encoding', 'UTF-8']
+
+                    logger.quiet 'Configuring unit testing options'
+                    project.tasks.getByName( 'test' ).scanForTestClasses = false
+                    project.tasks.getByName( 'test' ).includes = ['**/*UnitTest.class']
+                    project.tasks.getByName( 'test' ).excludes = ['**/AbstractCardUnitTest.class','**/AbstractUnitTest.class']
+                    // needed for Java 7 and Cobertura combination
+                    project.tasks.getByName( 'test' ).jvmArgs "-XX:-UseSplitVerifier"
+                    project.tasks.getByName( 'test' ).maxParallelForks = Runtime.runtime.availableProcessors()
+
+                    task collectJars(type: Copy) {
+                        description 'Copy dependencies into build area for use by IDEs'
+                        into "$buildDir/dependencies"
+                        from( [configurations.testRuntime,configurations.sourceArchives] )
+                        doFirst { logger.quiet "Copying dependencies to $buildDir/dependencies" }
+                    }
+                    project.defaultTasks = ['collectJars'] + project.defaultTasks
+
+                    logger.quiet 'Applying jdepend plug-in'
+                    project.plugins.apply( 'jdepend' )
+                    project.jdependMain.enabled = true
+                    project.jdependTest.enabled = true
+                    project.properties['jdepend'].ignoreFailures = false
+                    project.properties['jdepend'].sourceSets = [sourceSets.main,sourceSets.test]
+
+                    logger.quiet 'Applying checkstyle plug-in'
+                    project.plugins.apply( 'checkstyle' )
+                    project.properties['checkstyle'].ignoreFailures = false
+                    project.checkstyleMain.enabled = true
+                    project.checkstyleTest.enabled = false
+                    new File( "$buildDir" ).mkdirs()
+                    ant.get( src: 'https://raw.github.com/kurron/tl-unified-build/master/config/checkstyle/checkstyle.xml',
+                            dest: "$buildDir/checkstyle.xml",
+                            verbose: true,
+                            usetimestamp: true,
+                            maxtime: httpTimeOut )
+                    project.checkstyle.configFile = file("$buildDir/checkstyle.xml")
+                    project.checkstyle.configProperties = [suppressionDirectory: projectDir.path ]
+
+                    ext.sharedManifest = manifest {
+                        attributes( "Implementation-Title": project.name, "Implementation-Version": project.version )
+                    }
+
+                    jar {
+                        manifest = project.manifest {
+                            from sharedManifest
+                        }
+                    }
+
+                    task sourcesJar(type: Jar, dependsOn: classes) {
+                        classifier = 'sources'
+                        from sourceSets.main.allSource
+                        exclude('**/*.properties')
+                        manifest = project.manifest {
+                            from sharedManifest
+                        }
+                    }
+
+                    task testSourcesJar(type: Jar, dependsOn: testClasses) {
+                        classifier = 'test-sources'
+                        from sourceSets.test.allSource
+                        exclude('**/*.properties')
+                        manifest = project.manifest {
+                            from sharedManifest
+                        }
+                    }
+
+                    task testBinariesJar(type: Jar, dependsOn: testClasses) {
+                        classifier = 'test'
+                        from sourceSets.test.output
+                        manifest = project.manifest {
+                            from sharedManifest
+                        }
+                    }
+
+                    task javadocJar(type: Jar, dependsOn: javadoc) {
+                        classifier = 'javadoc'
+                        from project.docsDir.path + '/javadoc'
+                        manifest = project.manifest {
+                            from sharedManifest
+                        }
+                    }
+
+                    artifacts {
+                        archives sourcesJar
+                        archives testSourcesJar
+                        archives testBinariesJar
+                        archives javadocJar
+                    }
+
+                    logger.quiet 'Applying cobertura plug-in'
+                    project.plugins.apply( 'cobertura' )
+                    project.coberturaInstrumentTest.enabled = false
+                    project.cobertura.includes = ['**/*.java', '**/*.groovy']
+                    if ( project.properties.containsKey( 'coverageExcludes' ) )
+                    {
+                        logger.quiet "Cobertura exclusions found."
+                        project.ext.coverageExcludes.each { logger.quiet "Excluding $it" }
+                        project.cobertura.ignores = project.ext.coverageExcludes
+                    }
+                    else
+                    {
+                        logger.quiet "Cobertura exclusions not found."
+                    }
+                    ant.taskdef( resource: 'tasks.properties',
+                            classpath: project.configurations.cobertura.asPath )
+                    task verifyCodeCoverage( dependsOn: 'test',
+                            description: 'Create code coverage reports',
+                            group: 'Reporting') {
+                        doFirst {
+                            logger.quiet "Consulting $buildDir/cobertura/main/cobertura-test.ser for coverage analysis."
+                            ant.'cobertura-check'( datafile: "$buildDir/cobertura/main/cobertura-test.ser",
+                                    branchrate: 50,
+                                    haltonfailure: false,
+                                    failureproperty: 'coverageFailure',
+                                    linerate: 50,
+                                    packagebranchrate: 50,
+                                    packagelinerate: 50,
+                                    totalbranchrate: 50,
+                                    totallinerate: 50 )
+
+                            if ( project.ant.properties.containsKey( 'coverageFailure' ) )
+                            {
+                                logger.quiet 'Property ant.properties.coverageFailure found. Checking for sufficient code coverage.'
+                                logger.quiet "ant.properties.coverageFailure = $ant.properties.coverageFailure"
+                                if( 'true' == ant.properties.coverageFailure )
+                                {
+                                    throw new RuntimeException("Not enough code coverage. Check $reporting.baseDir/cobertura/main for details.")
+                                }
+                            }
+                            else
+                            {
+                                logger.quiet 'Property ant.properties.coverageFailure not found. Assuming sufficient code coverage.'
+                            }
+                        }
+                    }
+                    project.tasks.getByName( 'check' ).dependsOn( verifyCodeCoverage )
+
+                    // we always want to remove Cobertura instrumented classes so that we don't have to issue clean builds in order to get correct coverage numbers
+                    task cleanCobertura( type: Delete ) {
+                        description = 'Removes Cobertura artifacts from the build area.'
+                        group = 'Build'
+
+                        logger.quiet "Cleaning Cobertura artifacts"
+                        delete 'build/cobertura', 'build/reports/cobertura'
+                    }
+
+                    project.tasks.getByName( 'compileJava' ).dependsOn( cleanCobertura )
+
+                    // the Maven plug-in onlu publishes if the Java plug-in is installed -- it is an unfixed bug
+                    logger.quiet( "Applying Maven plug-in" )
+                    project.plugins.apply( 'maven' )
+                    if ( project.isSnapshot )
+                    {
+                        logger.quiet 'Snapshot revision detected. Adding install task to default.'
+                        project.defaultTasks.add( 'install' )
+                    }
+                    else
+                    {
+                        // this is the publishing plugin that is currently in incubation.  Works great
+                        // but is limited to one artifact only.  We will switch over to this when it is
+                        // done baking.
+/*
+                    logger.quiet 'Release revision detected. Applying maven-publish plug-in.'
+                    project.plugins.apply( 'maven-publish' )
+                    project.defaultTasks.add( 'publishMavenPublicationToMavenLocal' )
+                    project.defaultTasks.add( 'publishMavenPublicationToMavenRepository' )
+
+                    project.publishing {
+                        repositories {
+                            maven {
+                                description 'Sandbox area of the repository to test publishing to'
+                                url = publicationUrl
+                                credentials {
+                                    username = publicationUsername
+                                    password = publicationPassword
+                                }
+                            }
+                        }
+                    }
+*/
+                        logger.quiet 'Release revision detected. Adding uploadArchives to default tasks.'
+                        project.uploadArchives {
+                            repositories {
+                                maven {
+                                    description 'Sandbox area of the repository to test publishing to'
+                                    url = publicationUrl
+                                    credentials {
+                                        username = publicationUsername
+                                        password = publicationPassword
+                                    }
+                                }
+                            }
+                        }
+                        project.defaultTasks.add( 'uploadArchives' )
+
+                    }
+
+                    if ( project.isSnapshot )
+                    {
+                        logger.quiet 'Snapshot revision detected. Sonar publication not configured.'
+                    }
+                    else
+                    {
+                        logger.quiet 'Release revision detected. Configuring for Sonar publication.'
+                        project.plugins.apply( 'sonar' )
+                        project.defaultTasks.add( 'sonarAnalyze' )
+                        project.sonar.server.url = "http://192.168.254.81:9000/"
+                        project.sonar.database.url = "jdbc:mysql://192.168.254.81/sonar"
+                        project.sonar.database.driverClassName = "com.mysql.jdbc.Driver"
+                        project.sonar.database.username = "sonar"
+                        project.sonar.database.password = "sonar"
+                        project.sonar.project.sourceEncoding = 'UTF-8'
+                        project.sonar.project.dynamicAnalysis = 'false'
+                        project.sonar.project.coberturaReportPath = file( "$reporting.baseDir/cobertura/main/coverage.xml" )
+                    }
+                }
+
+                if ( project.plugins.hasPlugin( GroovyPlugin ) )
+                {
+                    logger.quiet 'Groovy plugin detected!'
+                    project.dependencies  {
+                        compile module( "org.codehaus.groovy:groovy-all:${groovyVersion}:indy" )
+                        testCompile module( "org.spockframework:spock-core:${spockVersion}" )
+                        testCompile module( "org.codehaus.groovy:groovy-all:${groovyVersion}:indy" )
+
+                        sourceArchives module( "org.spockframework:spock-core:${spockVersion}:sources" )
+                    }
+
+                    logger.quiet 'Applying codenarc plug-in'
+                    project.plugins.apply( 'codenarc' )
+                    new File( "$buildDir" ).mkdirs()
+                    ant.get( src: 'https://raw.github.com/kurron/tl-unified-build/master/config/codenarc/codenarc.xml',
+                            dest: "$buildDir/codenarc.xml",
+                            verbose: true,
+                            usetimestamp: true,
+                            maxtime: httpTimeOut )
+                    project.codenarc.configFile = file( "${buildDir}/codenarc.xml" )
+                    project.codenarc.ignoreFailures = false
+                    project.codenarcMain.enabled = true
+                    project.codenarcTest.enabled = false
+
+                    task groovydocJar(type: Jar, dependsOn: groovydoc) {
+                        classifier = 'groovydoc'
+                        from project.docsDir.path + '/groovydoc'
+                        manifest = project.manifest {
+                            from sharedManifest
+                        }
+                    }
+
+                    artifacts {
+                        archives groovydocJar
+                    }
+                }
+
+                if ( !project.plugins.hasPlugin( ProjectReportsPlugin ) )
+                {
+                    logger.quiet 'Applying project-report plug-in'
+                    project.plugins.apply( 'project-report' )
+                    project.dependencyReport.enabled = true
+                    project.propertyReport.enabled = true
+                    project.taskReport.enabled = true
+                    // most useful if the reports are generated prior to other tasks running
+                    project.defaultTasks = ['projectReport'] + project.defaultTasks
+                }
+            }
+        }
+        else
+        {
+            logger.quiet( name + ' Generating stage two tasks' )
+        }
+    }
 }
