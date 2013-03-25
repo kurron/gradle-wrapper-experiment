@@ -8,7 +8,7 @@ buildscript {
         ext.groovyVersion  = '2.1.0'
         ext.spockVersion  = '0.7-groovy-2.0'
         ext.stageOne = (false == properties.containsKey( 'stage' ) )|| (properties.get( 'stage').equalsIgnoreCase( 'ONE' ) )
-        ext.publicationUrl = "http://192.168.254.81:81/artifactory/mods-release-local"
+        ext.modsUrl = "http://192.168.254.81:81/artifactory/mods-release-local"
         ext.publicationUsername = 'SVNBuild'
         ext.publicationPassword = 'Snoopy*09'
         ext.mavenCentralCacheUrl = "http://192.168.254.81:81/artifactory/repo1-cache"
@@ -40,7 +40,7 @@ buildscript {
                 maven {
                     name 'Experimental'
                     description 'Where to get internally published artifacts'
-                    url = publicationUrl
+                    url = modsUrl
                 }
             }
             dependencies {
@@ -81,13 +81,10 @@ buildscript {
                 url = localLibsCacheUrl
             }
             maven {
-                name 'Experimental'
+                name 'Sush-E'
                 description 'Local Artifactory cache of TL artifacts'
-                url = publicationUrl
+                url = modsUrl
             }
-            // our Artifactory cache has a problem fetching CodeNarc
-            // update: Scott says this has been fixed
-            //mavenCentral()
         }
 
         configurations {
@@ -290,7 +287,7 @@ buildscript {
                         repositories {
                             maven {
                                 description 'Sandbox area of the repository to test publishing to'
-                                url = publicationUrl
+                                url = modsUrl
                                 credentials {
                                     username = publicationUsername
                                     password = publicationPassword
@@ -303,7 +300,7 @@ buildscript {
                         project.uploadArchives {
                             repositories {
                                 maven {
-                                    description 'Sandbox area of the repository to test publishing to'
+                                    description 'Where to publish artifacts to.'
                                     url = publicationUrl
                                     credentials {
                                         username = publicationUsername
