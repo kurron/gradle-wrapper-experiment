@@ -301,7 +301,7 @@ buildscript {
                             repositories {
                                 maven {
                                     description 'Where to publish artifacts to.'
-                                    url = publicationUrl
+                                    url = modsUrl
                                     credentials {
                                         username = publicationUsername
                                         password = publicationPassword
