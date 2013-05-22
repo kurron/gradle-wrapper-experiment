@@ -16,14 +16,14 @@ if ( project.properties.containsKey( 'project_version' ) )
 }
 else
 {
-    ext.project_version = '1.4.0-SNAPSHOT'
+    ext.project_version = '1.6.0-SNAPSHOT'
     logger.quiet "project_version not specified.  Using default version of $project_version"
     status = 'integration'
 }
 project.version = project.project_version
 
 ext {
-    gradleVersion = '1.4'
+    gradleVersion = '1.6'
     publicationUrl = "http://192.168.254.81:81/artifactory/mods-release-local"
     publicationUsername = 'SVNBuild'
     publicationPassword = 'Snoopy*09'
@@ -83,6 +83,9 @@ task companyGradleZip(type: Zip, dependsOn: downloadGradle) {
     into("${downloadGradle.distributionNameBase}") {
         into('init.d') {
             from "src/scripts/init.d"
+        }
+        into('config') {
+            from "src/rules"
         }
     }
 }

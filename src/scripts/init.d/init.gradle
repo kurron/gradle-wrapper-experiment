@@ -2,11 +2,6 @@ logger.quiet 'Running custom init.gradle file'
 
 buildscript {
     allprojects {
-        ext.httpTimeOut = 4  // how many seconds to wait for the configuration files
-        ext.junitVersion  = '4.10'
-        ext.hamcrestVersion  = '1.3'
-        ext.groovyVersion  = '2.1.0'
-        ext.spockVersion  = '0.7-groovy-2.0'
         ext.stageOne = (false == properties.containsKey( 'stage' ) )|| (properties.get( 'stage').equalsIgnoreCase( 'ONE' ) )
         ext.modsUrl = "http://192.168.254.81:81/artifactory/mods-release-local"
         ext.publicationUsername = 'SVNBuild'
@@ -146,12 +141,7 @@ buildscript {
                     project.checkstyleMain.enabled = true
                     project.checkstyleTest.enabled = false
                     new File( "$buildDir" ).mkdirs()
-                    ant.get( src: 'https://raw.github.com/kurron/tl-unified-build/master/config/checkstyle/checkstyle.xml',
-                            dest: "$buildDir/checkstyle.xml",
-                            verbose: true,
-                            usetimestamp: true,
-                            maxtime: httpTimeOut )
-                    project.checkstyle.configFile = file("$buildDir/checkstyle.xml")
+                    project.checkstyle.configFile = file("${gradle.gradleHomeDir}/config/checkstyle.xml")
                     project.checkstyle.configProperties = [suppressionDirectory: projectDir.path ]
 
                     ext.sharedManifest = manifest {
@@ -347,12 +337,7 @@ buildscript {
                     logger.quiet 'Applying codenarc plug-in'
                     project.plugins.apply( 'codenarc' )
                     new File( "$buildDir" ).mkdirs()
-                    ant.get( src: 'https://raw.github.com/kurron/tl-unified-build/master/config/codenarc/codenarc.xml',
-                            dest: "$buildDir/codenarc.xml",
-                            verbose: true,
-                            usetimestamp: true,
-                            maxtime: httpTimeOut )
-                    project.codenarc.configFile = file( "${buildDir}/codenarc.xml" )
+                    project.codenarc.configFile = file( "${$gradle.gradleHomeDir}/config/codenarc.xml" )
                     project.codenarc.ignoreFailures = false
                     project.codenarcMain.enabled = true
                     project.codenarcTest.enabled = false
