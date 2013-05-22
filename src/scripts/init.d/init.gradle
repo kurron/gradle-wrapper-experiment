@@ -330,7 +330,7 @@ buildscript {
                     logger.quiet 'Applying codenarc plug-in'
                     project.plugins.apply( 'codenarc' )
                     new File( "$buildDir" ).mkdirs()
-                    project.codenarc.configFile = file( "${$gradle.gradleHomeDir}/config/codenarc.xml" )
+                    project.codenarc.configFile = file( "${gradle.gradleHomeDir}/config/codenarc.xml" )
                     project.codenarc.ignoreFailures = false
                     project.codenarcMain.enabled = true
                     project.codenarcTest.enabled = false
