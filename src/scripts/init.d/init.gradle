@@ -326,13 +326,6 @@ buildscript {
                 if ( project.plugins.hasPlugin( GroovyPlugin ) )
                 {
                     logger.quiet 'Groovy plugin detected!'
-                    project.dependencies  {
-                        compile module( "org.codehaus.groovy:groovy-all:${groovyVersion}:indy" )
-                        testCompile module( "org.spockframework:spock-core:${spockVersion}" )
-                        testCompile module( "org.codehaus.groovy:groovy-all:${groovyVersion}:indy" )
-
-                        sourceArchives module( "org.spockframework:spock-core:${spockVersion}:sources" )
-                    }
 
                     logger.quiet 'Applying codenarc plug-in'
                     project.plugins.apply( 'codenarc' )
