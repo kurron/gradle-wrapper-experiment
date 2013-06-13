@@ -9,7 +9,8 @@ buildscript {
         ext.mavenCentralCacheUrl = "http://192.168.254.81:81/artifactory/repo1-cache"
         ext.codehausCacheUrl = "http://192.168.254.81:81/artifactory/codehaus-cache"
         ext.jbossCacheUrl = "http://192.168.254.81:81/artifactory/jboss-cache"
-        ext.springsourceCacheUrl = "http://192.168.254.81:81/artifactory/springsource-repo-cache"
+        ext.springsourceCacheUrl = "http://192.168.254.81:81/artifactory/spring-release"
+        ext.springsourceMilestoneCacheUrl = "http://192.168.254.81:81/artifactory/spring-milestone"
         ext.localCacheUrl = "http://192.168.254.81:81/artifactory/ext-release-local"
         ext.localLibsCacheUrl = "http://192.168.254.81:81/artifactory/libs-release-local"
 
@@ -64,6 +65,11 @@ buildscript {
                 name 'SpringSourceCache'
                 description 'Local Artifactory cache of SpringSource'
                 url = springsourceCacheUrl
+            }
+            maven {
+                name 'SpringSourceMilestoneCache'
+                description 'Local Artifactory cache of SpringSource milestone builds'
+                url = springsourceMilestoneCacheUrl
             }
             maven {
                 name 'LocalReleaseCache'
