@@ -16,14 +16,14 @@ if ( project.properties.containsKey( 'project_version' ) )
 }
 else
 {
-    ext.project_version = '1.6.0-SNAPSHOT'
+    ext.project_version = '1.7.0-SNAPSHOT'
     logger.quiet "project_version not specified.  Using default version of $project_version"
     status = 'integration'
 }
 project.version = project.project_version
 
 ext {
-    gradleVersion = '1.6'
+    gradleVersion = '1.7'
     publicationUrl = "http://192.168.254.81:81/artifactory/mods-release-local"
     publicationUsername = 'SVNBuild'
     publicationPassword = 'Snoopy*09'
