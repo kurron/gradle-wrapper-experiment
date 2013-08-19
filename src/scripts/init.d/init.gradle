@@ -29,7 +29,8 @@ buildscript {
         project.version = project.project_version
         logger.quiet "version = $project.version"
 
-        group = 'com.transparent'
+        // we can no longer default the group name because we are running into name collisions
+        // group = 'com.transparent'
 
         buildscript {
             repositories {
