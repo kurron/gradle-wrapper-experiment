@@ -12,7 +12,11 @@
     <ruleset-ref path='rulesets/design.xml'/>
     <ruleset-ref path='rulesets/dry.xml'/>
     <ruleset-ref path='rulesets/exceptions.xml'/>
-    <ruleset-ref path='rulesets/formatting.xml'/>
+    <ruleset-ref path='rulesets/formatting.xml'>
+        <rule-config name='LineLength'>
+            <property name='length' value='150'/>
+        </rule-config>
+    </ruleset-ref>
     <ruleset-ref path='rulesets/generic.xml'/>
     <ruleset-ref path='rulesets/grails.xml'/>
     <ruleset-ref path='rulesets/groovyism.xml'/>
