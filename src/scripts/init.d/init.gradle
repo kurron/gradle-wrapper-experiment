@@ -135,13 +135,6 @@ buildscript {
                     }
                     project.defaultTasks = ['collectJars'] + project.defaultTasks
 
-                    logger.quiet 'Applying jdepend plug-in'
-                    project.plugins.apply( 'jdepend' )
-                    project.jdependMain.enabled = true
-                    project.jdependTest.enabled = true
-                    project.properties['jdepend'].ignoreFailures = false
-                    project.properties['jdepend'].sourceSets = [sourceSets.main,sourceSets.test]
-
                     logger.quiet 'Applying checkstyle plug-in'
                     project.plugins.apply( 'checkstyle' )
                     project.properties['checkstyle'].ignoreFailures = false
@@ -308,25 +301,6 @@ buildscript {
                         }
                         project.defaultTasks.add( 'uploadArchives' )
 
-                    }
-
-                    if ( project.isSnapshot )
-                    {
-                        logger.quiet 'Snapshot revision detected. Sonar publication not configured.'
-                    }
-                    else
-                    {
-                        logger.quiet 'Release revision detected. Configuring for Sonar publication.'
-                        project.plugins.apply( 'sonar' )
-                        project.defaultTasks.add( 'sonarAnalyze' )
-                        project.sonar.server.url = "http://192.168.254.81:9000/"
-                        project.sonar.database.url = "jdbc:mysql://192.168.254.81/sonar"
-                        project.sonar.database.driverClassName = "com.mysql.jdbc.Driver"
-                        project.sonar.database.username = "sonar"
-                        project.sonar.database.password = "sonar"
-                        project.sonar.project.sourceEncoding = 'UTF-8'
-                        project.sonar.project.dynamicAnalysis = 'false'
-                        project.sonar.project.coberturaReportPath = file( "$reporting.baseDir/cobertura/main/coverage.xml" )
                     }
                 }
 

@@ -24,7 +24,11 @@
     <ruleset-ref path='rulesets/jdbc.xml'/>
     <ruleset-ref path='rulesets/junit.xml'/>
     <ruleset-ref path='rulesets/logging.xml'/>
-    <ruleset-ref path='rulesets/naming.xml'/>
+    <ruleset-ref path='rulesets/naming.xml'>
+        <rule-config name='FactoryMethodName'>
+            <property name='enabled' value='false'/>
+        </rule-config>
+    </ruleset-ref>
     <ruleset-ref path='rulesets/security.xml'/>
     <ruleset-ref path='rulesets/serialization.xml'/>
     <ruleset-ref path='rulesets/size.xml'/>
