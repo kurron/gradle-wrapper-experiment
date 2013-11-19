@@ -23,7 +23,7 @@ else
 project.version = project.project_version
 
 ext {
-    gradleVersion = '1.8'
+    gradleVersion = '1.9'
     publicationUrl = "http://192.168.254.81:81/artifactory/mods-release-local"
     publicationUsername = 'SVNBuild'
     publicationPassword = 'Snoopy*09'
