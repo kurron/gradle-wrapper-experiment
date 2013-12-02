@@ -14,16 +14,14 @@ buildscript {
         ext.localCacheUrl = "http://192.168.254.81:81/artifactory/ext-release-local"
         ext.localLibsCacheUrl = "http://192.168.254.81:81/artifactory/libs-release-local"
 
-        if ( project.properties.containsKey( 'project_version' ) )
-
-        {
+        if ( project.properties.containsKey( 'project_version' ) ) {
             logger.quiet "Using specifed project_version of $project_version"
             status = 'release'
         }
         else
         {
             ext.project_version = '1.0.0-SNAPSHOT'
-            logger.quiet "project_version not specified.  Using default version of $project_version"
+            logger.quiet "project_version not specified. Using default version of $project_version"
             status = 'integration'
         }
         project.version = project.project_version
@@ -89,12 +87,6 @@ buildscript {
             }
         }
 
-        configurations {
-            sourceArchives {
-                description = 'Artifact that contains the source code of the dependencies.'
-            }
-        }
-
         if ( stageOne )
         {
             afterEvaluate { project ->
@@ -102,38 +94,26 @@ buildscript {
                 ext.isSnapshot = version.endsWith("-SNAPSHOT")
 
 
-                if ( project.plugins.hasPlugin( WarPlugin ) )
-                {
-                    war {
-                        manifest {
-                            attributes( "Implementation-Title": project.name, "Implementation-Version": project.version )
-                        }                }
+                if ( project.plugins.hasPlugin( WarPlugin ) ) {
+                    war.manifest.attributes( "Implementation-Title": project.name, "Implementation-Version": project.version )
                 }
 
                 if ( project.plugins.hasPlugin( JavaPlugin ) )
                 {
                     logger.quiet 'Java plugin detected!'
-                    project.defaultTasks.add( 'build' )
+                    project.defaultTasks << 'build'
 
                     logger.quiet 'Configuring compiler options'
-                    project.tasks.getByName( 'compileJava' ).options*.compilerArgs = ['-Xlint:deprecation','-encoding', 'UTF-8']
-                    project.tasks.getByName( 'compileTestJava' ).options*.compilerArgs = ['-Xlint:deprecation','-encoding', 'UTF-8']
+                    compileJava.options*.compilerArgs = ['-Xlint:deprecation','-encoding', 'UTF-8']
+                    compileTestJava.options*.compilerArgs = ['-Xlint:deprecation','-encoding', 'UTF-8']
 
                     logger.quiet 'Configuring unit testing options'
-                    project.tasks.getByName( 'test' ).scanForTestClasses = false
-                    project.tasks.getByName( 'test' ).includes = ['**/*UnitTest.class']
-                    project.tasks.getByName( 'test' ).excludes = ['**/AbstractCardUnitTest.class','**/AbstractUnitTest.class']
-                    // needed for Java 7 and Cobertura combination
-                    project.tasks.getByName( 'test' ).jvmArgs "-XX:-UseSplitVerifier"
-                    project.tasks.getByName( 'test' ).maxParallelForks = Runtime.runtime.availableProcessors()
-
-                    task collectJars(type: Copy) {
-                        description 'Copy dependencies into build area for use by IDEs'
-                        into "$buildDir/dependencies"
-                        from( [configurations.testRuntime,configurations.sourceArchives] )
-                        doFirst { logger.quiet "Copying dependencies to $buildDir/dependencies" }
+                    test {
+                        scanForTestClasses = false
+                        includes = ['**/*UnitTest.class']
+                        excludes = ['**/AbstractUnitTest.class']
+                        maxParallelForks = Runtime.runtime.availableProcessors()
                     }
-                    project.defaultTasks = ['collectJars'] + project.defaultTasks
 
                     logger.quiet 'Applying checkstyle plug-in'
                     project.plugins.apply( 'checkstyle' )
@@ -144,6 +124,7 @@ buildscript {
                     project.checkstyle.configFile = file("${gradle.gradleHomeDir}/config/checkstyle.xml")
                     project.checkstyle.configProperties = [suppressionDirectory: projectDir.path ]
 
+                    // create a manifest that's copied into each jar file
                     ext.sharedManifest = manifest {
                         attributes( "Implementation-Title": project.name, "Implementation-Version": project.version )
                     }
@@ -254,13 +235,13 @@ buildscript {
 
                     project.tasks.getByName( 'compileJava' ).dependsOn( cleanCobertura )
 
-                    // the Maven plug-in onlu publishes if the Java plug-in is installed -- it is an unfixed bug
+                    // the Maven plug-in only publishes if the Java plug-in is installed -- it is an unfixed bug
                     logger.quiet( "Applying Maven plug-in" )
                     project.plugins.apply( 'maven' )
                     if ( project.isSnapshot )
                     {
                         logger.quiet 'Snapshot revision detected. Adding install task to default.'
-                        project.defaultTasks.add( 'install' )
+                        project.defaultTasks << 'install'
                     }
                     else
                     {
@@ -299,18 +280,17 @@ buildscript {
                                 }
                             }
                         }
-                        project.defaultTasks.add( 'uploadArchives' )
+                        project.defaultTasks << 'uploadArchives'
 
                     }
                 }
 
-                if ( project.plugins.hasPlugin( GroovyPlugin ) )
-                {
+                if ( project.plugins.hasPlugin( GroovyPlugin ) ) {
                     logger.quiet 'Groovy plugin detected!'
 
                     logger.quiet 'Applying codenarc plug-in'
                     project.plugins.apply( 'codenarc' )
-                    new File( "$buildDir" ).mkdirs()
+                    new File( buildDir.path ).mkdirs()
                     project.codenarc.configFile = file( "${gradle.gradleHomeDir}/config/codenarc.xml" )
                     project.codenarc.ignoreFailures = false
                     project.codenarcMain.enabled = true
@@ -329,20 +309,15 @@ buildscript {
                     }
                 }
 
-                if ( !project.plugins.hasPlugin( ProjectReportsPlugin ) )
-                {
+                if ( !project.plugins.hasPlugin( ProjectReportsPlugin ) ) {
                     logger.quiet 'Applying project-report plug-in'
                     project.plugins.apply( 'project-report' )
                     project.dependencyReport.enabled = true
                     project.propertyReport.enabled = true
                     project.taskReport.enabled = true
-                    // most useful if the reports are generated prior to other tasks running
-                    project.defaultTasks = ['projectReport'] + project.defaultTasks
                 }
             }
-        }
-        else
-        {
+        } else {
             logger.quiet( name + ' Generating stage two tasks' )
         }
     }
