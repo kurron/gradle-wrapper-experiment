@@ -2,17 +2,20 @@ logger.quiet 'Running custom init.gradle file'
 
 buildscript {
     allprojects {
-        ext.stageOne = (false == properties.containsKey( 'stage' ) )|| (properties.get( 'stage').equalsIgnoreCase( 'ONE' ) )
-        ext.modsUrl = "http://192.168.254.81:81/artifactory/mods-release-local"
-        ext.publicationUsername = 'SVNBuild'
-        ext.publicationPassword = 'Snoopy*09'
-        ext.mavenCentralCacheUrl = "http://192.168.254.81:81/artifactory/repo1-cache"
-        ext.codehausCacheUrl = "http://192.168.254.81:81/artifactory/codehaus-cache"
-        ext.jbossCacheUrl = "http://192.168.254.81:81/artifactory/jboss-cache"
-        ext.springsourceCacheUrl = "http://192.168.254.81:81/artifactory/spring-release"
-        ext.springsourceMilestoneCacheUrl = "http://192.168.254.81:81/artifactory/spring-milestone"
-        ext.localCacheUrl = "http://192.168.254.81:81/artifactory/ext-release-local"
-        ext.localLibsCacheUrl = "http://192.168.254.81:81/artifactory/libs-release-local"
+        ext {
+            stageOne = (false == properties.containsKey( 'stage' ) )|| (properties.get( 'stage').equalsIgnoreCase( 'ONE' ) )
+            jacocoVersion = '0.6.3.201306030806'
+            modsUrl = "http://192.168.254.81:81/artifactory/mods-release-local"
+            publicationUsername = 'SVNBuild'
+            publicationPassword = 'Snoopy*09'
+            mavenCentralCacheUrl = "http://192.168.254.81:81/artifactory/repo1-cache"
+            codehausCacheUrl = "http://192.168.254.81:81/artifactory/codehaus-cache"
+            jbossCacheUrl = "http://192.168.254.81:81/artifactory/jboss-cache"
+            springsourceCacheUrl = "http://192.168.254.81:81/artifactory/spring-release"
+            springsourceMilestoneCacheUrl = "http://192.168.254.81:81/artifactory/spring-milestone"
+            localCacheUrl = "http://192.168.254.81:81/artifactory/ext-release-local"
+            localLibsCacheUrl = "http://192.168.254.81:81/artifactory/libs-release-local"
+        }
 
         if ( project.properties.containsKey( 'project_version' ) ) {
             logger.quiet "Using specifed project_version of $project_version"
@@ -40,7 +43,6 @@ buildscript {
             }
             dependencies {
                 classpath group: 'org.kurron', name: 'tl-unified-build', version: '1.0.4'
-                classpath 'org.kurron:gradle-cobertura-plugin:2.0.0'
             }
         }
 
@@ -87,8 +89,12 @@ buildscript {
             }
         }
 
-        if ( stageOne )
-        {
+        if ( stageOne ) {
+            // apply jacoco plugin outside of afterEvaluate block, or errors occur during build.
+            logger.quiet 'Applying Jacoco plug-in...'
+            apply plugin: 'jacoco'
+            jacoco.toolVersion = jacocoVersion
+
             afterEvaluate { project ->
                 logger.quiet( "Generating stage one tasks for $name project" )
                 ext.isSnapshot = version.endsWith("-SNAPSHOT")
@@ -176,64 +182,42 @@ buildscript {
                         archives javadocJar
                     }
 
-                    logger.quiet 'Applying cobertura plug-in'
-                    project.plugins.apply( 'cobertura' )
-                    project.coberturaInstrumentTest.enabled = false
-                    project.cobertura.includes = ['**/*.java', '**/*.groovy']
-                    if ( project.properties.containsKey( 'coverageExcludes' ) )
-                    {
-                        logger.quiet "Cobertura exclusions found."
-                        project.ext.coverageExcludes.each { logger.quiet "Excluding $it" }
-                        project.cobertura.ignores = project.ext.coverageExcludes
+                    logger.quiet 'Configuring Jacoco plug-in...'
+                    jacocoTestReport {
+                        reports {
+                            xml.enabled true
+                            csv.enabled false
+                            html.enabled true
+                        }
                     }
-                    else
-                    {
-                        logger.quiet "Cobertura exclusions not found."
-                    }
-                    ant.taskdef( resource: 'tasks.properties',
-                            classpath: project.configurations.cobertura.asPath )
-                    task verifyCodeCoverage( dependsOn: 'test',
-                            description: 'Create code coverage reports',
-                            group: 'Reporting') {
-                        doFirst {
-                            logger.quiet "Consulting $buildDir/cobertura/main/cobertura-test.ser for coverage analysis."
-                            ant.'cobertura-check'( datafile: "$buildDir/cobertura/main/cobertura-test.ser",
-                                    branchrate: 50,
-                                    haltonfailure: false,
-                                    failureproperty: 'coverageFailure',
-                                    linerate: 50,
-                                    packagebranchrate: 50,
-                                    packagelinerate: 50,
-                                    totalbranchrate: 50,
-                                    totallinerate: 50 )
 
-                            if ( project.ant.properties.containsKey( 'coverageFailure' ) )
-                            {
-                                logger.quiet 'Property ant.properties.coverageFailure found. Checking for sufficient code coverage.'
-                                logger.quiet "ant.properties.coverageFailure = $ant.properties.coverageFailure"
-                                if( 'true' == ant.properties.coverageFailure )
-                                {
-                                    throw new RuntimeException("Not enough code coverage. Check $reporting.baseDir/cobertura/main for details.")
-                                }
+                    // Since the JaCoCo plug in does not honor excludes or break the build if coverage thresholds are crossed, we have to do it by hand.
+                    task verifyCodeCoverage( dependsOn: 'jacocoTestReport' ) {
+                        description = 'Parses the generated Jacoco xml report, and determines if sufficient coverage is present.'
+                        group = 'Build'
+
+                        doFirst {
+
+                            // remove the DOCTYPE tag from the generated xml, otherwise we have to provide report.dtd ourselves.
+                            def jacocoReportPath = "${jacoco.reportsDir}/test/jacocoTestReport.xml"
+                            logger.quiet "Parsing generated Jacoco xml report found at $jacocoReportPath"
+                            String xmlStr = new File( jacocoReportPath ).text.replace( '<!DOCTYPE report PUBLIC "-//JACOCO//DTD Report 1.0//EN" "report.dtd">', '' )
+                            def xml = new XmlParser( false, false ).parse( new ByteArrayInputStream( xmlStr.bytes ) )
+
+                            List jacocoExclude = project.properties.containsKey( 'coverageExcludes' ) ? project.ext.coverageExcludes : []
+                            def filtered = xml.package.class.findAll { clazz -> !jacocoExclude.any { clazz.@name.contains( it ) } }
+                            def instructions = filtered.collect{ it.counter }.flatten().findAll{ it.@type == 'INSTRUCTION' }.flatten()
+                            def offenders = instructions.findAll { (it.@missed as int) >= (it.@covered as int) }.collect { it.parent().attributes().name }
+                            offenders.each { logger.quiet "Insufficient code coverage: $it" }
+                            if ( offenders ) {
+                                throw new IllegalStateException( "Not enough code coverage! Consult ${jacoco.reportsDir}/test/html/index.html for details." )
                             }
-                            else
-                            {
-                                logger.quiet 'Property ant.properties.coverageFailure not found. Assuming sufficient code coverage.'
+                            else {
+                                logger.quiet 'Adequate code coverage detected.'
                             }
                         }
                     }
-                    project.tasks.getByName( 'check' ).dependsOn( verifyCodeCoverage )
-
-                    // we always want to remove Cobertura instrumented classes so that we don't have to issue clean builds in order to get correct coverage numbers
-                    task cleanCobertura( type: Delete ) {
-                        description = 'Removes Cobertura artifacts from the build area.'
-                        group = 'Build'
-
-                        logger.quiet "Cleaning Cobertura artifacts"
-                        delete 'build/cobertura', 'build/reports/cobertura'
-                    }
-
-                    project.tasks.getByName( 'compileJava' ).dependsOn( cleanCobertura )
+                    check.dependsOn 'verifyCodeCoverage'
 
                     // the Maven plug-in only publishes if the Java plug-in is installed -- it is an unfixed bug
                     logger.quiet( "Applying Maven plug-in" )
