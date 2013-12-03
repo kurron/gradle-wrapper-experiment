@@ -16,7 +16,7 @@ if ( project.properties.containsKey( 'project_version' ) )
 }
 else
 {
-    ext.project_version = '1.8.0-SNAPSHOT'
+    ext.project_version = '1.9.1-SNAPSHOT'
     logger.quiet "project_version not specified.  Using default version of $project_version"
     status = 'integration'
 }
