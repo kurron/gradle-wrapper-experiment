@@ -121,6 +121,14 @@ buildscript {
                         maxParallelForks = Runtime.runtime.availableProcessors()
                     }
 
+                    task collectJars(type: Copy) {
+                        description 'Copy dependencies into build area for use by stage-two'
+                        into "$buildDir/dependencies"
+                        from( configurations.testRuntime )
+                        doFirst { logger.quiet "Copying dependencies to $buildDir/dependencies" }
+                    }
+                    project.defaultTasks = ['collectJars'] + project.defaultTasks
+
                     logger.quiet 'Applying checkstyle plug-in'
                     project.plugins.apply( 'checkstyle' )
                     project.properties['checkstyle'].ignoreFailures = false
