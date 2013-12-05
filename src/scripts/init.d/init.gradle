@@ -278,7 +278,10 @@ buildscript {
                 }
 
                 if ( project.plugins.hasPlugin( GroovyPlugin ) ) {
-                    logger.quiet 'Groovy plugin detected!'
+                    logger.quiet 'Groovy plugin detected! Setting indy flag...'
+
+                    compileGroovy.groovyOptions.optimizationOptions['indy'] = true
+                    compileTestGroovy.groovyOptions.optimizationOptions['indy'] = true
 
                     logger.quiet 'Applying codenarc plug-in'
                     project.plugins.apply( 'codenarc' )
