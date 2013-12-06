@@ -19,14 +19,15 @@ buildscript {
 
         if ( project.properties.containsKey( 'project_version' ) ) {
             logger.quiet "Using specifed project_version of $project_version"
-            status = 'release'
+            project.publicationStatus = 'release'
         }
         else
         {
             ext.project_version = '1.0.0-SNAPSHOT'
             logger.quiet "project_version not specified. Using default version of $project_version"
-            status = 'integration'
+            project.publicationStatus = 'integration'
         }
+        logger.quiet "project.publicationStatus = $project.publicationStatus"
         project.version = project.project_version
         logger.quiet "version = $project.version"
 
